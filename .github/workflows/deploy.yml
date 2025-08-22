@@ -1,0 +1,47 @@
+name: Deploy to Kubernetes
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # 1. Kodu çek
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    # 2. Docker BuildKit setup
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    # 3. Docker Hub'a login (secrets gerekli)
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        
+    # 4. Docker image build ve push
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/wordpress-cicd:${{ github.sha }}
+        
+    # 5. Kubernetes manifest'i güncelle
+    - name: Update Kubernetes manifest
+      run: |
+        sed -i 's|DOCKER_IMAGE_PLACEHOLDER|${{ secrets.DOCKER_USERNAME }}/wordpress-cicd:${{ github.sha }}|g' k8s-manifests/wordpress.yaml
+        
+    # 6. Kubernetes'e deploy et (minikube için)
+    - name: Deploy to Kubernetes
+      run: |
+        echo "Kubernetes deployment files updated!"
+        echo "Docker image: ${{ secrets.DOCKER_USERNAME }}/wordpress-cicd:${{ github.sha }}"
+        cat k8s-manifests/wordpress.yaml
